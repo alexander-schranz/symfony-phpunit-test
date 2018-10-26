@@ -215,18 +215,22 @@ function loadPhpConfigFiles() {
     }
 
     // Use config file when given it over -c argument
-    if ('-c' === $argv[1]) { // TODO use array_search to get the -c position
-        if (!isset($argv[2]) || !is_file($argv[2])) {
+    if (($configArgumentNr = array_search('-c', $argv))
+        || ($configArgumentNr = array_search('--cconfiguration', $argv)))
+    {
+        ++$configArgumentNr;
+
+        if (!isset($argv[$configArgumentNr])) {
             outputError('Please provide a configuration file when using "-c" argument!');
 
             exit(1);
         }
 
-        $phpUnitConfigFiles[] = realpath($argv[2]);
+        $phpUnitConfigFiles[] = realpath($argv[$configArgumentNr]);
 
         // following arguments are given manully to the phpunit process
-        unset($argv[1]);
-        unset($argv[2]);
+        unset($argv[$configArgumentNr]);
+        unset($argv[$configArgumentNr - 1]);
 
         return $phpUnitConfigFiles;
     }
