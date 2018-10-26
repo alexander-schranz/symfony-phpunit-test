@@ -3,6 +3,7 @@
 ## Install first the dependencies with:
 
 ```bash
+composer install
 bin/phpunit -c src/Modul1/phpunit.xml.dist
 SYMFONY_PHPUNIT_VERSION=5.7 bin/phpunit -c src/Modul2/phpunit.xml.dist
 ```
