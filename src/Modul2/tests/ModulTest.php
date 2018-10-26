@@ -33,7 +33,7 @@ class ModulTest extends TestCase
     public function testSymfonyDeprecationHelper()
     {
         $this->assertSame('weak', getenv('SYMFONY_DEPRECATIONS_HELPER'));
-        $this->assertSame('modul2', getenv('SYMFONY_PHPUNIT_REMOVE'));
+        $this->assertSame('phpspec/prophecy', getenv('SYMFONY_PHPUNIT_REMOVE'));
         $this->assertSame('5.7', getenv('SYMFONY_PHPUNIT_VERSION'));
 
         @trigger_error('Deprecation Error which should be ignored');

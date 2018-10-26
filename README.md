@@ -1,11 +1,9 @@
 # Test Setup to [fix simple-phpunit](https://github.com/symfony/symfony/issues/28895)
 
-## Install first the dependencies with:
+## Install dependencies:
 
 ```bash
 composer install
-bin/phpunit -c src/Modul1/phpunit.xml.dist
-SYMFONY_PHPUNIT_VERSION=5.7 bin/phpunit -c src/Modul2/phpunit.xml.dist
 ```
 
 ## Use the scripts

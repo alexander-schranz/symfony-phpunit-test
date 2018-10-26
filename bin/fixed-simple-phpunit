@@ -3,14 +3,14 @@
 
 error_reporting(-1);
 
-global $argv, $argc;
+global $argv, $argc, $PHP;
 
 $argv = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+$PHP = defined('PHP_BINARY') ? PHP_BINARY : 'php';
 $cmd = array_map('escapeshellarg', $argv);
 
 $phpUnitConfigFiles = loadPhpConfigFiles();
 
-$PHP_BINARY = defined('PHP_BINARY') ? PHP_BINARY : 'php';
 $runningProcs = array();
 $exit = 0;
 
@@ -31,13 +31,12 @@ if (1 === count($phpUnitConfigFiles)) {
 
     foreach ($phpUnitConfigFiles as $phpUnitConfigFile) {
         $phpUnitVersion = getPhpUnitVersion($phpUnitConfigFile);
-        removePhpUnitDependencyConflicts($phpUnitConfigFile, $phpUnitVersion);
 
         $phpUnit = getPhpUnit($phpUnitVersion, $phpUnitConfigFile);
         $folder = dirname($phpUnitConfigFile);
 
         $cmd = sprintf('%s %s -c %s %s --colors=always > %s/phpunit.stdout 2> %s/phpunit.stderr',
-            escapeshellcmd($PHP_BINARY),
+            escapeshellcmd($PHP),
             escapeshellcmd($phpUnit),
             escapeshellarg($phpUnitConfigFile),
             implode(' ', array_map('escapeshellarg', $argv)),
@@ -119,19 +118,125 @@ function getPhpUnit($phpUnitVersion = null, $phpUnitConfigFile = null)
 
     $PHPUNIT_DIR = getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_DIR', getRootDirectory().'/vendor/bin/.phpunit');
 
-    $phpUnit = $PHPUNIT_DIR . '/phpunit-' . $phpUnitVersion . '/phpunit';
+    $phpUnit = $PHPUNIT_DIR . '/phpunit-' . $phpUnitVersion;
+
+    // make own phpunit version when dependency is removed
+    $SYMFONY_PHPUNIT_REMOVE = getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_REMOVE', '');
+
+    if ($SYMFONY_PHPUNIT_REMOVE) {
+        $phpUnit .= '-remove-' . str_replace(['/', ' '], ['_', '-'], $SYMFONY_PHPUNIT_REMOVE);
+    }
+
+    $phpUnit .= '/phpunit';
 
     if (!file_exists($phpUnit)) {
-        loadPhpUnit($phpUnitVersion, $phpUnit);
+        loadPhpUnit($phpUnitVersion, $phpUnit, $SYMFONY_PHPUNIT_REMOVE);
     }
 
     return $phpUnit;
 }
 
-function loadPhpUnit($phpUnitVersion, $phpUnit)
+function loadPhpUnit($PHPUNIT_VERSION, $phpUnit, $SYMFONY_PHPUNIT_REMOVE)
 {
-    // TODO load php unit like
+    global $PHP;
 
+    $PHPUNIT_DIR = dirname(dirname($phpUnit));
+
+    // Build a standalone phpunit without symfony/yaml nor prophecy by default
+    $root = getRootDirectory();
+
+    $oldPwd = getcwd();
+
+    $COMPOSER = file_exists($COMPOSER = $oldPwd.'/composer.phar') || ($COMPOSER = rtrim('\\' === DIRECTORY_SEPARATOR ? preg_replace('/[\r\n].*/', '', `where.exe composer.phar`) : `which composer.phar 2> /dev/null`))
+        ? $PHP.' '.escapeshellarg($COMPOSER)
+        : 'composer';
+
+    @mkdir($PHPUNIT_DIR, 0777, true);
+    chdir($PHPUNIT_DIR);
+
+    $phpUnitDirectory = basename(dirname($phpUnit));
+
+    if (file_exists($phpUnitDirectory)) {
+        passthru(sprintf('\\' === DIRECTORY_SEPARATOR ? '(del /S /F /Q %s & rmdir %1$s) >nul': 'rm -rf %s', $phpUnitDirectory));
+    }
+
+    if (extension_loaded('openssl') && ini_get('allow_url_fopen') && !isset($_SERVER['http_proxy']) && !isset($_SERVER['https_proxy'])) {
+        $remoteZip = "https://github.com/sebastianbergmann/phpunit/archive/$PHPUNIT_VERSION.zip";
+        $remoteZipStream = @fopen($remoteZip, 'rb');
+        if (!$remoteZipStream) {
+            throw new \RuntimeException("Could not find $remoteZip");
+        }
+        stream_copy_to_stream($remoteZipStream, fopen("$PHPUNIT_VERSION.zip", 'wb'));
+    } elseif ('\\' === DIRECTORY_SEPARATOR) {
+        passthru("certutil -urlcache -split -f \"https://github.com/sebastianbergmann/phpunit/archive/$PHPUNIT_VERSION.zip\" $PHPUNIT_VERSION.zip");
+    } else {
+        @unlink("$PHPUNIT_VERSION.zip");
+        passthru("wget -q https://github.com/sebastianbergmann/phpunit/archive/$PHPUNIT_VERSION.zip");
+
+    }
+    if (!class_exists('ZipArchive')) {
+        throw new \Exception('simple-phpunit requires the "zip" PHP extension to be installed and enabled in order to uncompress the downloaded PHPUnit packages.');
+    }
+
+    $extractDirectory = getcwd() . '/extract-' . $phpUnitDirectory;
+
+    $zip = new ZipArchive();
+    $zip->open("$PHPUNIT_VERSION.zip");
+    $zip->extractTo($extractDirectory);
+    $zip->close();
+
+    rename($extractDirectory . '/phpunit-'. $PHPUNIT_VERSION, getcwd() . '/' . $phpUnitDirectory);
+    rmdir($extractDirectory);
+
+    chdir($phpUnitDirectory);
+
+    if ($SYMFONY_PHPUNIT_REMOVE) {
+        passthru("$COMPOSER remove --no-update ".$SYMFONY_PHPUNIT_REMOVE);
+    }
+    if (5.1 <= $PHPUNIT_VERSION && $PHPUNIT_VERSION < 5.4) {
+        passthru("$COMPOSER require --no-update phpunit/phpunit-mock-objects \"~3.1.0\"");
+    }
+    if (file_exists($path = $root.'/vendor/symfony/phpunit-bridge')) {
+        passthru("$COMPOSER require --no-update symfony/phpunit-bridge \"*@dev\"");
+        passthru("$COMPOSER config repositories.phpunit-bridge path ".escapeshellarg(str_replace('/', DIRECTORY_SEPARATOR, $path)));
+        if ('\\' === DIRECTORY_SEPARATOR) {
+            file_put_contents('composer.json', preg_replace('/^( {8})"phpunit-bridge": \{$/m', "$0\n$1    ".'"options": {"symlink": false},', file_get_contents('composer.json')));
+        }
+    } else {
+        passthru("$COMPOSER require --no-update symfony/phpunit-bridge \"*\"");
+    }
+    $prevRoot = getenv('COMPOSER_ROOT_VERSION');
+    putenv("COMPOSER_ROOT_VERSION=$PHPUNIT_VERSION.99");
+    // --no-suggest is not in the list to keep compat with composer 1.0, which is shipped with Ubuntu 16.04LTS
+    $exit = proc_close(proc_open("$COMPOSER install --no-dev --prefer-dist --no-progress --ansi", array(), $p, getcwd(), null, array('bypass_shell' => true)));
+    putenv('COMPOSER_ROOT_VERSION'.(false !== $prevRoot ? '='.$prevRoot : ''));
+    if ($exit) {
+        exit($exit);
+    }
+    file_put_contents('phpunit', <<<'EOPHP'
+<?php
+
+define('PHPUNIT_COMPOSER_INSTALL', __DIR__.'/vendor/autoload.php');
+require PHPUNIT_COMPOSER_INSTALL;
+
+if (!class_exists('SymfonyBlacklistPhpunit', false)) {
+    class SymfonyBlacklistPhpunit {}
+}
+if (class_exists('PHPUnit_Util_Blacklist')) {
+    PHPUnit_Util_Blacklist::$blacklistedClassNames['SymfonyBlacklistPhpunit'] = 1;
+    PHPUnit_Util_Blacklist::$blacklistedClassNames['SymfonyBlacklistSimplePhpunit'] = 1;
+} else {
+    PHPUnit\Util\Blacklist::$blacklistedClassNames['SymfonyBlacklistPhpunit'] = 1;
+    PHPUnit\Util\Blacklist::$blacklistedClassNames['SymfonyBlacklistSimplePhpunit'] = 1;
+}
+
+Symfony\Bridge\PhpUnit\TextUI\Command::main();
+
+EOPHP
+    );
+    chdir('..');
+    file_put_contents(".$PHPUNIT_VERSION.md5", md5_file(__FILE__)."\n".$SYMFONY_PHPUNIT_REMOVE);
+    chdir($oldPwd);
 }
 
 function removePhpUnitDependencyConflicts($phpUnitConfigFile, $phpUnitVersion)

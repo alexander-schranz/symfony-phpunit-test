@@ -12,7 +12,7 @@
         <server name="SERVER_VAR" value="SERVER_VAR_MODUL_1"/>
         <env name="ENV_VAR" value="ENV_VAR_MODUL_1" />
         <env name="SYMFONY_DEPRECATIONS_HELPER" value="disabled" />
-        <env name="SYMFONY_PHPUNIT_REMOVE" value="modul1" />
+        <env name="SYMFONY_PHPUNIT_REMOVE" value="symfony/yaml" />
         <env name="SYMFONY_PHPUNIT_VERSION" value="6.5" />
     </php>
 
