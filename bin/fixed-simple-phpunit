@@ -8,39 +8,65 @@ global $argv, $argc;
 $argv = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
 $cmd = array_map('escapeshellarg', $argv);
 
-unset($argv[0]);
-
 $phpUnitConfigFiles = loadPhpConfigFiles();
 
 $PHP_BINARY = defined('PHP_BINARY') ? PHP_BINARY : 'php';
 $runningProcs = array();
+$exit = 0;
 
-foreach ($phpUnitConfigFiles as $phpUnitConfigFile) {
+array_splice($argv, 1, 0, array('--colors=always'));
+
+$phpUnitVersion = null;
+$phpUnitConfigFile = null;
+
+if (1 === count($phpUnitConfigFiles)) {
+    // When only one phpunit config file run it directly in current process for streamed output
+    $phpUnitConfigFile = reset($phpUnitConfigFiles);
     $phpUnitVersion = getPhpUnitVersion($phpUnitConfigFile);
     removePhpUnitDependencyConflicts($phpUnitConfigFile, $phpUnitVersion);
-    $phpUnit = getPhpUnit($phpUnitConfigFile, $phpUnitVersion);
-    $folder = dirname($phpUnitConfigFile);
+    $argv[] = '-c';
+    $argv[] = $phpUnitConfigFile;
+} else {
+    unset($argv[0]);
 
-    // TODO if (1 === count($phpUnitConfigFiles)) run phpunit directly
+    foreach ($phpUnitConfigFiles as $phpUnitConfigFile) {
+        $phpUnitVersion = getPhpUnitVersion($phpUnitConfigFile);
+        removePhpUnitDependencyConflicts($phpUnitConfigFile, $phpUnitVersion);
 
-    $cmd = sprintf('%s %s -c %s %s --colors=always > %s/phpunit.stdout 2> %s/phpunit.stderr',
-        escapeshellcmd($PHP_BINARY),
-        escapeshellcmd($phpUnit),
-        escapeshellarg($phpUnitConfigFile),
-        implode(' ', array_map('escapeshellarg', $argv)),
-        escapeshellarg($folder),
-        escapeshellarg($folder)
-    );
+        $phpUnit = getPhpUnit($phpUnitVersion, $phpUnitConfigFile);
+        $folder = dirname($phpUnitConfigFile);
 
-    if ($proc = proc_open($cmd, array(), $pipes)) {
-        $runningProcs[$folder] = $proc;
-    } else {
-        $exit = 1;
-        echo "\033[41mKO\033[0m $folder\n\n";
+        $cmd = sprintf('%s %s -c %s %s --colors=always > %s/phpunit.stdout 2> %s/phpunit.stderr',
+            escapeshellcmd($PHP_BINARY),
+            escapeshellcmd($phpUnit),
+            escapeshellarg($phpUnitConfigFile),
+            implode(' ', array_map('escapeshellarg', $argv)),
+            escapeshellarg($folder),
+            escapeshellarg($folder)
+        );
+
+        if ($proc = proc_open($cmd, array(), $pipes)) {
+            $runningProcs[$folder] = $proc;
+        } else {
+            $exit = 1;
+            echo "\033[41mKO\033[0m $folder\n\n";
+        }
     }
 }
 
-exit(runProcs($runningProcs));
+if (count($runningProcs)) {
+    $exit = runProcs($runningProcs);
+} else {
+    if (!class_exists('SymfonyBlacklistSimplePhpunit', false)) {
+        class SymfonyBlacklistSimplePhpunit {}
+    }
+
+    $_SERVER['argv'] = $argv;
+    $_SERVER['argc'] = ++$argc;
+    include getPhpUnit($phpUnitVersion, $phpUnitConfigFile);
+}
+
+exit($exit);
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------
@@ -85,8 +111,12 @@ function runProcs($runningProcs)
     return $exit;
 }
 
-function getPhpUnit($phpUnitConfigFile, $phpUnitVersion)
+function getPhpUnit($phpUnitVersion = null, $phpUnitConfigFile = null)
 {
+    if (null === $phpUnitVersion) {
+        $phpUnitVersion = getPhpUnitVersion($phpUnitConfigFile);
+    }
+
     $PHPUNIT_DIR = getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_DIR', getRootDirectory().'/vendor/bin/.phpunit');
 
     $phpUnit = $PHPUNIT_DIR . '/phpunit-' . $phpUnitVersion . '/phpunit';
@@ -129,7 +159,7 @@ function getRootDirectory()
     return $root;
 }
 
-function getPhpUnitVersion($phpUnitConfigFile)
+function getPhpUnitVersion($phpUnitConfigFile = null)
 {
     if (PHP_VERSION_ID >= 70200) {
         // PHPUnit 6 is required for PHP 7.2+
@@ -152,13 +182,15 @@ function getEnvVar($phpUnitConfigFile, $name, $default = false)
         return $value;
     }
 
-    // Load phpunit config files and search for the env variable
-    $phpunitConfig = new DomDocument();
-    $phpunitConfig->load($phpUnitConfigFile);
+    if (file_exists($phpUnitConfigFile)) {
+        // Load phpunit config files and search for the env variable
+        $phpunitConfig = new DomDocument();
+        $phpunitConfig->load($phpUnitConfigFile);
 
-    $var = new DOMXpath($phpunitConfig);
-    foreach ($var->query('//php/env[@name="'.$name.'"]') as $var) {
-        return $var->getAttribute('value');
+        $var = new DOMXpath($phpunitConfig);
+        foreach ($var->query('//php/env[@name="'.$name.'"]') as $var) {
+            return $var->getAttribute('value');
+        }
     }
 
     return $default;
@@ -167,65 +199,72 @@ function getEnvVar($phpUnitConfigFile, $name, $default = false)
 function loadPhpConfigFiles() {
     global $argv;
 
-    static $phpUnitConfigFiles;
+    $phpUnitConfigFiles = [];
 
-    if (!$phpUnitConfigFiles) {
-        // Use configuration file current folder when no arguments given
-        if (!isset($argv[1])) {
-            if (file_exists('phpunit.xml')) {
-                $phpUnitConfigFiles[] = realpath('phpunit.xml');
-            } elseif (file_exists('phpunit.xml.dist')) {
-                $phpUnitConfigFiles[] = realpath('phpunit.xml.dist');
-            } else {
-                outputError('No phpunit.xml.dist file found!');
-            }
-
-            return $phpUnitConfigFiles;
+    // Use configuration file current folder when no arguments given
+    if (!isset($argv[1])) {
+        if (file_exists('phpunit.xml')) {
+            $phpUnitConfigFiles[] = realpath('phpunit.xml');
+        } elseif (file_exists('phpunit.xml.dist')) {
+            $phpUnitConfigFiles[] = realpath('phpunit.xml.dist');
+        } else {
+            outputError('No phpunit.xml.dist file found!');
         }
 
-        // Use config file when given it over -c argument
-        if ('-c' === $argv[1]) { // TODO use array_search to get the -c position
-            if (!isset($argv[2]) || !is_file($argv[2])) {
-                outputError('Please provide a configuration file when using "-c" argument!');
+        return $phpUnitConfigFiles;
+    }
 
-                exit(1);
-            }
+    // Use config file when given it over -c argument
+    if ('-c' === $argv[1]) { // TODO use array_search to get the -c position
+        if (!isset($argv[2]) || !is_file($argv[2])) {
+            outputError('Please provide a configuration file when using "-c" argument!');
 
-            $phpUnitConfigFiles[] = realpath($argv[2]);
-
-            // following arguments are given manully to the phpunit process
-            unset($argv[1]);
-            unset($argv[2]);
-
-            return $phpUnitConfigFiles;
+            exit(1);
         }
 
-        // Find all config file when folder given
-        if (is_dir($argv[1])) {
-            $finder = new RecursiveDirectoryIterator($argv[1], FilesystemIterator::KEY_AS_FILENAME | FilesystemIterator::UNIX_PATHS);
-            $finder = new RecursiveIteratorIterator($finder);
-            $finder->setMaxDepth(getenv('SYMFONY_PHPUNIT_MAX_DEPTH') ?: 3);
+        $phpUnitConfigFiles[] = realpath($argv[2]);
 
-            foreach ($finder as $file => $fileInfo) {
-                // Prefer phpunit.xml over phpunit.xml.dist file
-                $folder = dirname($fileInfo->getPathname());
-                if ('phpunit.xml.dist' === $file && !isset($phpUnitConfigFiles[$folder])) {
-                    $phpUnitConfigFiles[$folder] = realpath($fileInfo->getPathname());
-                } elseif ('phpunit.xml' === $file) {
-                    $phpUnitConfigFiles[$folder] = realpath($fileInfo->getPathname());
-                }
+        // following arguments are given manully to the phpunit process
+        unset($argv[1]);
+        unset($argv[2]);
+
+        return $phpUnitConfigFiles;
+    }
+
+    if (isset($argv[1]) && 'symfony' === $argv[1] && !file_exists('symfony') && file_exists('src/Symfony')) {
+        // If symfony if given set the folder to src/Symfony
+        $argv[1] = 'src/Symfony';
+    }
+
+    // Find all config file when folder given
+    if (is_dir($argv[1])) {
+        $finder = new RecursiveDirectoryIterator($argv[1], FilesystemIterator::KEY_AS_FILENAME | FilesystemIterator::UNIX_PATHS);
+        $finder = new RecursiveIteratorIterator($finder);
+        $finder->setMaxDepth(getenv('SYMFONY_PHPUNIT_MAX_DEPTH') ?: 3);
+
+        foreach ($finder as $file => $fileInfo) {
+            // Prefer phpunit.xml over phpunit.xml.dist file
+            $folder = dirname($fileInfo->getPathname());
+            if ('phpunit.xml.dist' === $file && !isset($phpUnitConfigFiles[$folder])) {
+                $phpUnitConfigFiles[$folder] = realpath($fileInfo->getPathname());
+            } elseif ('phpunit.xml' === $file) {
+                $phpUnitConfigFiles[$folder] = realpath($fileInfo->getPathname());
             }
-
-            ksort($phpUnitConfigFiles);
-
-            array_values($phpUnitConfigFiles);
-
-            if (0 === count($phpUnitConfigFiles)) {
-                outputError('No configuration files found in: ' . getcwd() . $argv[1]);
-            }
-
-            unset($argv[1]); // $argv[1] should not provided to phpunit process
         }
+
+        ksort($phpUnitConfigFiles);
+
+        array_values($phpUnitConfigFiles);
+
+        if (0 === count($phpUnitConfigFiles)) {
+            outputError('No configuration files found in: ' . getcwd() . $argv[1]);
+        }
+
+        unset($argv[1]); // $argv[1] should not provided to phpunit process
+    } elseif(file_exists($argv[1])) {
+        $phpUnitConfigFiles[] = $argv[1];
+
+        unset($argv[1]); // $argv[1] should not provided to phpunit process
     }
 
     return $phpUnitConfigFiles;
@@ -233,7 +272,7 @@ function loadPhpConfigFiles() {
 
 function outputError($text, $exitCode = 1)
 {
-    echo '�[41m' . $text . '�[0m' . PHP_EOL;
+    echo "\033[41m" . $text . "\033[0m" . PHP_EOL;
 
     exit($exitCode);
 }

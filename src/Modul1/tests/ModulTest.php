@@ -19,6 +19,10 @@ class ModulTest extends TestCase
     public function testBootstrapEnv()
     {
         $this->assertSame('BOOTSTRAP_ENV_VAR_MODUL_1', getenv('BOOTSTRAP_ENV_VAR'));
+
+        sleep(1); // To Check if the output is streamed
+
+        $this->assertTrue(true);
     }
 
     public function testBootstrapServer()
@@ -31,5 +35,7 @@ class ModulTest extends TestCase
         $this->assertSame('disabled', getenv('SYMFONY_DEPRECATIONS_HELPER'));
         $this->assertSame('modul1', getenv('SYMFONY_PHPUNIT_REMOVE'));
         $this->assertSame('6.5', getenv('SYMFONY_PHPUNIT_VERSION'));
+
+        @trigger_error('Deprecation Error which should be ignored');
     }
 }
