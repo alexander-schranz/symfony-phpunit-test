@@ -31,7 +31,6 @@ if (1 === count($phpUnitConfigFiles)) {
 
     foreach ($phpUnitConfigFiles as $phpUnitConfigFile) {
         $phpUnitVersion = getPhpUnitVersion($phpUnitConfigFile);
-
         $phpUnit = getPhpUnit($phpUnitVersion, $phpUnitConfigFile);
         $folder = dirname($phpUnitConfigFile);
 
@@ -55,6 +54,9 @@ if (1 === count($phpUnitConfigFiles)) {
 
 if (count($runningProcs)) {
     $exit = runProcs($runningProcs);
+} elseif (isset($argv[1]) && 'install' === $argv[1] || file_exists('install')) {
+    // Only install phpunit
+    getPhpUnit($phpUnitVersion, $phpUnitConfigFile);
 } else {
     if (!class_exists('SymfonyBlacklistSimplePhpunit', false)) {
         class SymfonyBlacklistSimplePhpunit {}
@@ -251,6 +253,12 @@ function getRootDirectory()
     static $root;
 
     if (!$root) {
+        $root = getenv('SYMFONY_PHPUNIT_ROOT_DIRECTORY');
+
+        if ($root) {
+            return $root;
+        }
+
         // Go the folders up until find a composer.json file
         $root = __DIR__;
         while (!file_exists($root.'/composer.json') || file_exists($root.'/DeprecationErrorHandler.php')) {
