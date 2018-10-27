@@ -142,7 +142,7 @@ $getPHPUnit = function ($phpUnitVersion, $phpUnitConfigFile = null)
         throw new \Exception('simple-phpunit requires the "zip" PHP extension to be installed and enabled in order to uncompress the downloaded PHPUnit packages.');
     }
 
-    // Extract phpunit file
+    // Extract phpunit file to own directory
     $extractDirectory = getcwd() . '/extract-' . $phpUnitDirectory;
 
     $zip = new ZipArchive();
@@ -150,10 +150,7 @@ $getPHPUnit = function ($phpUnitVersion, $phpUnitConfigFile = null)
     $zip->extractTo($extractDirectory);
     $zip->close();
 
-    rename($extractDirectory . '/phpunit-'. $phpUnitVersion, getcwd() . '/' . $phpUnitDirectory);
-    rmdir($extractDirectory);
-
-    chdir($phpUnitDirectory);
+    chdir($extractDirectory . '/phpunit-'. $phpUnitVersion);
 
     // Remove dependencies like symfony/yaml and prophecy
     if ($SYMFONY_PHPUNIT_REMOVE) {
@@ -200,6 +197,12 @@ Symfony\Bridge\PhpUnit\TextUI\Command::main();
 
 EOPHP
     );
+
+    // After finishing dependency install move directory to correct place
+    rename($extractDirectory . '/phpunit-'. $phpUnitVersion, $PHPUNIT_DIR . '/' . $phpUnitDirectory);
+    rmdir($extractDirectory);
+
+    chdir($oldPwd);
 
     return $phpUnit;
 };
@@ -277,7 +280,7 @@ $loadPHPUnitConfigFiles = function () {
 
         $phpUnitConfigFiles[] = realpath($argv[$configArgumentNr]);
 
-        // following arguments are given manully to the phpunit process
+        // Following arguments are given manually to the phpunit process
         unset($argv[$configArgumentNr]);
         unset($argv[$configArgumentNr - 1]);
 
@@ -374,7 +377,7 @@ if (1 === count($phpUnitConfigFiles)) {
 }
 
 if (count($runningProcs)) {
-    // Wait for the processes to be finished and output there result.
+    // Wait for the processes to be finished and output there result
     while ($runningProcs) {
         usleep(300000);
         $terminatedProcs = array();
