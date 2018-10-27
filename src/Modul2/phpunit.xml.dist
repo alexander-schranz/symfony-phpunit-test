@@ -9,6 +9,7 @@
 >
     <php>
         <ini name="memory_limit" value="-1" />
+        <ini name="precision" value="9"/>
         <server name="SERVER_VAR" value="SERVER_VAR_MODUL_2"/>
         <env name="ENV_VAR" value="ENV_VAR_MODUL_2" />
         <env name="SYMFONY_DEPRECATIONS_HELPER" value="weak" />

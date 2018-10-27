@@ -16,6 +16,11 @@ class ModulTest extends TestCase
         $this->assertSame('SERVER_VAR_MODUL_1', $_SERVER['SERVER_VAR']);
     }
 
+    public function testIni()
+    {
+        $this->assertSame('7', ini_get('precision'));
+    }
+
     public function testBootstrapEnv()
     {
         $this->assertSame('BOOTSTRAP_ENV_VAR_MODUL_1', getenv('BOOTSTRAP_ENV_VAR'));
@@ -28,6 +33,11 @@ class ModulTest extends TestCase
     public function testBootstrapServer()
     {
         $this->assertSame('BOOTSTRAP_SERVER_VAR_MODUL_1', $_SERVER['BOOTSTRAP_SERVER_VAR']);
+    }
+
+    public function testBootstrapIni()
+    {
+        $this->assertSame('15', ini_get('serialize_precision'));
     }
 
     public function testSymfonyEnvs()
