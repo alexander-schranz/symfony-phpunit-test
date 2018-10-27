@@ -36,10 +36,10 @@ $getEnvVar = function ($phpUnitConfigFile, $name, $default = false)
 
     if (file_exists($phpUnitConfigFile)) {
         // Load phpunit config files and search for the env variable
-        $phpunitConfig = new DomDocument();
-        $phpunitConfig->load($phpUnitConfigFile);
+        $phpUnitConfig = new DomDocument();
+        $phpUnitConfig->load($phpUnitConfigFile);
 
-        $var = new DOMXpath($phpunitConfig);
+        $var = new DOMXpath($phpUnitConfig);
         foreach ($var->query('//php/env[@name="'.$name.'"]') as $var) {
             $currentValue = $var->getAttribute('value');
 
@@ -61,12 +61,12 @@ $getEnvVar = function ($phpUnitConfigFile, $name, $default = false)
 /**
  * Get the phpunit binary if not exist download phpunit install it with given configuration.
  *
- * @param string $PHPUNIT_VERSION
+ * @param string $phpUnitVersion
  * @param string|null $phpUnitConfigFile
  *
  * @return string
  */
-$getPhpUnit = function ($PHPUNIT_VERSION, $phpUnitConfigFile = null)
+$getPHPUnit = function ($phpUnitVersion, $phpUnitConfigFile = null)
 {
     global $PHP, $getEnvVar;
 
@@ -91,7 +91,7 @@ $getPhpUnit = function ($PHPUNIT_VERSION, $phpUnitConfigFile = null)
     // Get directory where the phpunit versions get installed
     $PHPUNIT_DIR = $getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_DIR', $root.'/vendor/bin/.phpunit');
 
-    $phpUnit = $PHPUNIT_DIR . '/phpunit-' . $PHPUNIT_VERSION;
+    $phpUnit = $PHPUNIT_DIR . '/phpunit-' . $phpUnitVersion;
 
     // make own phpunit version when dependencies are removed
     $SYMFONY_PHPUNIT_REMOVE = $getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_REMOVE', '');
@@ -126,18 +126,17 @@ $getPhpUnit = function ($PHPUNIT_VERSION, $phpUnitConfigFile = null)
 
     // Download phpunit zip file
     if (extension_loaded('openssl') && ini_get('allow_url_fopen') && !isset($_SERVER['http_proxy']) && !isset($_SERVER['https_proxy'])) {
-        $remoteZip = "https://github.com/sebastianbergmann/phpunit/archive/$PHPUNIT_VERSION.zip";
+        $remoteZip = "https://github.com/sebastianbergmann/phpunit/archive/$phpUnitVersion.zip";
         $remoteZipStream = @fopen($remoteZip, 'rb');
         if (!$remoteZipStream) {
             throw new \RuntimeException("Could not find $remoteZip");
         }
-        stream_copy_to_stream($remoteZipStream, fopen("$PHPUNIT_VERSION.zip", 'wb'));
+        stream_copy_to_stream($remoteZipStream, fopen("$phpUnitVersion.zip", 'wb'));
     } elseif ('\\' === DIRECTORY_SEPARATOR) {
-        passthru("certutil -urlcache -split -f \"https://github.com/sebastianbergmann/phpunit/archive/$PHPUNIT_VERSION.zip\" $PHPUNIT_VERSION.zip");
+        passthru("certutil -urlcache -split -f \"https://github.com/sebastianbergmann/phpunit/archive/$phpUnitVersion.zip\" $phpUnitVersion.zip");
     } else {
-        @unlink("$PHPUNIT_VERSION.zip");
-        passthru("wget -q https://github.com/sebastianbergmann/phpunit/archive/$PHPUNIT_VERSION.zip");
-
+        @unlink("$phpUnitVersion.zip");
+        passthru("wget -q https://github.com/sebastianbergmann/phpunit/archive/$phpUnitVersion.zip");
     }
     if (!class_exists('ZipArchive')) {
         throw new \Exception('simple-phpunit requires the "zip" PHP extension to be installed and enabled in order to uncompress the downloaded PHPUnit packages.');
@@ -147,11 +146,11 @@ $getPhpUnit = function ($PHPUNIT_VERSION, $phpUnitConfigFile = null)
     $extractDirectory = getcwd() . '/extract-' . $phpUnitDirectory;
 
     $zip = new ZipArchive();
-    $zip->open("$PHPUNIT_VERSION.zip");
+    $zip->open("$phpUnitVersion.zip");
     $zip->extractTo($extractDirectory);
     $zip->close();
 
-    rename($extractDirectory . '/phpunit-'. $PHPUNIT_VERSION, getcwd() . '/' . $phpUnitDirectory);
+    rename($extractDirectory . '/phpunit-'. $phpUnitVersion, getcwd() . '/' . $phpUnitDirectory);
     rmdir($extractDirectory);
 
     chdir($phpUnitDirectory);
@@ -160,7 +159,7 @@ $getPhpUnit = function ($PHPUNIT_VERSION, $phpUnitConfigFile = null)
     if ($SYMFONY_PHPUNIT_REMOVE) {
         passthru("$COMPOSER remove --no-update ".$SYMFONY_PHPUNIT_REMOVE);
     }
-    if (5.1 <= $PHPUNIT_VERSION && $PHPUNIT_VERSION < 5.4) {
+    if (5.1 <= $phpUnitVersion && $phpUnitVersion < 5.4) {
         passthru("$COMPOSER require --no-update phpunit/phpunit-mock-objects \"~3.1.0\"");
     }
     if (file_exists($path = $root.'/vendor/symfony/phpunit-bridge')) {
@@ -173,7 +172,7 @@ $getPhpUnit = function ($PHPUNIT_VERSION, $phpUnitConfigFile = null)
         passthru("$COMPOSER require --no-update symfony/phpunit-bridge \"*\"");
     }
     $prevRoot = getenv('COMPOSER_ROOT_VERSION');
-    putenv("COMPOSER_ROOT_VERSION=$PHPUNIT_VERSION.99");
+    putenv("COMPOSER_ROOT_VERSION=$phpUnitVersion.99");
     // --no-suggest is not in the list to keep compat with composer 1.0, which is shipped with Ubuntu 16.04LTS
     $exit = proc_close(proc_open("$COMPOSER install --no-dev --prefer-dist --no-progress --ansi", array(), $p, getcwd(), null, array('bypass_shell' => true)));
     putenv('COMPOSER_ROOT_VERSION'.(false !== $prevRoot ? '='.$prevRoot : ''));
@@ -208,26 +207,26 @@ EOPHP
 /**
  * Get the phpunit version from SYMFONY_PHPUNIT_VERSION env variable or the given phpunit config file.
  *
- * @param null $phpUnitConfigFile
+ * @param string|null $phpUnitConfigFile
  *
  * @return mixed|string
  */
-$getPhpUnitVersion = function ($phpUnitConfigFile = null)
+$getPHPUnitVersion = function ($phpUnitConfigFile = null)
 {
     global $getEnvVar;
 
     if (PHP_VERSION_ID >= 70200) {
         // PHPUnit 6 is required for PHP 7.2+
-        $PHPUNIT_VERSION = $getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_VERSION', '6.5');
+        $phpUnitVersion = $getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_VERSION', '6.5');
     } elseif (PHP_VERSION_ID >= 50600) {
         // PHPUnit 4 does not support PHP 7
-        $PHPUNIT_VERSION = $getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_VERSION', '5.7');
+        $phpUnitVersion = $getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_VERSION', '5.7');
     } else {
         // PHPUnit 5.1 requires PHP 5.6+
-        $PHPUNIT_VERSION = '4.8';
+        $phpUnitVersion = '4.8';
     }
 
-    return $PHPUNIT_VERSION;
+    return $phpUnitVersion;
 };
 
 /**
@@ -239,7 +238,7 @@ $getPhpUnitVersion = function ($phpUnitConfigFile = null)
  *
  * @return array
  */
-$loadPhpUnitConfigFiles = function () {
+$loadPHPUnitConfigFiles = function () {
     global $argv;
 
     $outputError = function($text, $exitCode = 1)
@@ -332,7 +331,7 @@ $argv = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
 $PHP = defined('PHP_BINARY') ? PHP_BINARY : 'php';
 $cmd = array_map('escapeshellarg', $argv);
 
-$phpUnitConfigFiles = $loadPhpUnitConfigFiles();
+$phpUnitConfigFiles = $loadPHPUnitConfigFiles();
 
 $runningProcs = array();
 $exit = 0;
@@ -341,19 +340,19 @@ if (!isset($argv[1]) || 'install' !== $argv[1]) {
     array_splice($argv, 1, 0, array('--colors=always'));
 }
 
-$PHPUNIT_VERSION = $getPhpUnitVersion();
+$phpUnitVersion = $getPHPUnitVersion();
 $phpUnitConfigFile = null;
 
 if (1 === count($phpUnitConfigFiles)) {
     // When only one phpunit config file run it directly in current process for streamed output
     $phpUnitConfigFile = reset($phpUnitConfigFiles);
-    $PHPUNIT_VERSION = $getPhpUnitVersion($phpUnitConfigFile);
+    $phpUnitVersion = $getPHPUnitVersion($phpUnitConfigFile);
     $argv[] = '-c';
     $argv[] = $phpUnitConfigFile;
 } else {
     foreach ($phpUnitConfigFiles as $phpUnitConfigFile) {
-        $PHPUNIT_VERSION = $getPhpUnitVersion($phpUnitConfigFile);
-        $phpUnit = $getPhpUnit($PHPUNIT_VERSION, $phpUnitConfigFile);
+        $phpUnitVersion = $getPHPUnitVersion($phpUnitConfigFile);
+        $phpUnit = $getPHPUnit($phpUnitVersion, $phpUnitConfigFile);
         $component = dirname($phpUnitConfigFile);
 
         $cmd = sprintf('%s %s -c %s %s > %s/phpunit.stdout 2> %s/phpunit.stderr',
@@ -410,7 +409,7 @@ if (count($runningProcs)) {
 } elseif (isset($argv[1]) && 'install' === $argv[1] || file_exists('install')) {
     // If not yet installed install phpunit
     if (0 === count($phpUnitConfigFiles)) {
-        $getPhpUnit($PHPUNIT_VERSION, $phpUnitConfigFile);
+        $getPHPUnit($phpUnitVersion, $phpUnitConfigFile);
     }
 } else {
     // If only one configuration file is found call phpunit directly
@@ -420,7 +419,7 @@ if (count($runningProcs)) {
 
     $_SERVER['argv'] = $argv;
     $_SERVER['argc'] = ++$argc;
-    include $getPhpUnit($PHPUNIT_VERSION, $phpUnitConfigFile);
+    include $getPHPUnit($phpUnitVersion, $phpUnitConfigFile);
 }
 
 exit($exit);
