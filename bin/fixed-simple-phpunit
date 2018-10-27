@@ -335,7 +335,7 @@ $exit = 0;
 
 array_splice($argv, 1, 0, array('--colors=always'));
 
-$PHPUNIT_VERSION = null;
+$PHPUNIT_VERSION = $getPhpUnitVersion();
 $phpUnitConfigFile = null;
 
 if (1 === count($phpUnitConfigFiles)) {
@@ -406,7 +406,7 @@ if (count($runningProcs)) {
 } elseif (isset($argv[1]) && 'install' === $argv[1] || file_exists('install')) {
     // If not yet installed install phpunit
     if (0 === count($phpUnitConfigFiles)) {
-        $getPhpUnit($getPhpUnitVersion($phpUnitConfigFile), $phpUnitConfigFile);
+        $getPhpUnit($PHPUNIT_VERSION, $phpUnitConfigFile);
     }
 } else {
     // If only one configuration file is found call phpunit directly
