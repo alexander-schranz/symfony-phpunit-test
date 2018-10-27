@@ -51,6 +51,10 @@ $getEnvVar = function ($phpUnitConfigFile, $name, $default = false)
         }
     }
 
+    if (false !== $value) {
+        return $value;
+    }
+
     return $default;
 };
 
@@ -197,9 +201,6 @@ Symfony\Bridge\PhpUnit\TextUI\Command::main();
 
 EOPHP
     );
-    chdir('..');
-    file_put_contents(".$PHPUNIT_VERSION.md5", md5_file(__FILE__)."\n".$SYMFONY_PHPUNIT_REMOVE);
-    chdir($oldPwd);
 
     return $phpUnit;
 };
