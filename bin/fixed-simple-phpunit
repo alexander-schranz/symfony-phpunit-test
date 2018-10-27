@@ -1,6 +1,18 @@
 #!/usr/bin/env php
 <?php
 
+/*
+ * This file is part of the Symfony package.
+ *
+ * (c) Fabien Potencier <fabien@symfony.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+// Please update when phpunit needs to be reinstalled with fresh deps:
+// Cache-Id-Version: 2017-11-22 09:30 UTC
+
 error_reporting(-1);
 
 global $argv, $argc, $PHP, $getEnvVar;
@@ -282,11 +294,11 @@ $loadPhpUnitConfigFiles = function () {
 
         foreach ($finder as $file => $fileInfo) {
             // Prefer phpunit.xml over phpunit.xml.dist file
-            $folder = dirname($fileInfo->getPathname());
-            if ('phpunit.xml.dist' === $file && !isset($phpUnitConfigFiles[$folder])) {
-                $phpUnitConfigFiles[$folder] = realpath($fileInfo->getPathname());
+            $component = dirname($fileInfo->getPathname());
+            if ('phpunit.xml.dist' === $file && !isset($phpUnitConfigFiles[$component])) {
+                $phpUnitConfigFiles[$component] = realpath($fileInfo->getPathname());
             } elseif ('phpunit.xml' === $file) {
-                $phpUnitConfigFiles[$folder] = realpath($fileInfo->getPathname());
+                $phpUnitConfigFiles[$component] = realpath($fileInfo->getPathname());
             }
         }
 
@@ -338,22 +350,22 @@ if (1 === count($phpUnitConfigFiles)) {
     foreach ($phpUnitConfigFiles as $phpUnitConfigFile) {
         $PHPUNIT_VERSION = $getPhpUnitVersion($phpUnitConfigFile);
         $phpUnit = $getPhpUnit($PHPUNIT_VERSION, $phpUnitConfigFile);
-        $folder = dirname($phpUnitConfigFile);
+        $component = dirname($phpUnitConfigFile);
 
         $cmd = sprintf('%s %s -c %s %s --colors=always > %s/phpunit.stdout 2> %s/phpunit.stderr',
             escapeshellcmd($PHP),
             escapeshellcmd($phpUnit),
             escapeshellarg($phpUnitConfigFile),
             implode(' ', array_map('escapeshellarg', $argv)),
-            escapeshellarg($folder),
-            escapeshellarg($folder)
+            escapeshellarg($component),
+            escapeshellarg($component)
         );
 
         if ($proc = proc_open($cmd, array(), $pipes)) {
-            $runningProcs[$folder] = $proc;
+            $runningProcs[$component] = $proc;
         } else {
             $exit = 1;
-            echo "\033[41mKO\033[0m $folder\n\n";
+            echo "\033[41mKO\033[0m $component\n\n";
         }
     }
 }
