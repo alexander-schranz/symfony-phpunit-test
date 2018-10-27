@@ -351,8 +351,6 @@ if (1 === count($phpUnitConfigFiles)) {
     $argv[] = '-c';
     $argv[] = $phpUnitConfigFile;
 } else {
-    unset($argv[0]);
-
     foreach ($phpUnitConfigFiles as $phpUnitConfigFile) {
         $PHPUNIT_VERSION = $getPhpUnitVersion($phpUnitConfigFile);
         $phpUnit = $getPhpUnit($PHPUNIT_VERSION, $phpUnitConfigFile);
@@ -362,7 +360,7 @@ if (1 === count($phpUnitConfigFiles)) {
             escapeshellcmd($PHP),
             escapeshellcmd($phpUnit),
             escapeshellarg($phpUnitConfigFile),
-            implode(' ', array_map('escapeshellarg', $argv)),
+            implode(' ', array_map('escapeshellarg', array_slice($argv, 1))),
             escapeshellarg($component),
             escapeshellarg($component)
         );
