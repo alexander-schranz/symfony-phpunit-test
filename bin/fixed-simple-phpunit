@@ -356,7 +356,7 @@ if (1 === count($phpUnitConfigFiles)) {
         $phpUnit = $getPhpUnit($PHPUNIT_VERSION, $phpUnitConfigFile);
         $component = dirname($phpUnitConfigFile);
 
-        $cmd = sprintf('%s %s -c %s %s --colors=always > %s/phpunit.stdout 2> %s/phpunit.stderr',
+        $cmd = sprintf('%s %s -c %s %s > %s/phpunit.stdout 2> %s/phpunit.stderr',
             escapeshellcmd($PHP),
             escapeshellcmd($phpUnit),
             escapeshellarg($phpUnitConfigFile),
