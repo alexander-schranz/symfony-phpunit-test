@@ -32,10 +32,7 @@ global $argv, $argc, $PHP, $getEnvVar;
  */
 $getEnvVar = function ($phpUnitConfigFile, $name, $default = false)
 {
-    // Search first for given env variables
-    if (false !== $value = getenv($name)) {
-        return $value;
-    }
+    $value = getenv($name);
 
     if (file_exists($phpUnitConfigFile)) {
         // Load phpunit config files and search for the env variable
@@ -44,7 +41,13 @@ $getEnvVar = function ($phpUnitConfigFile, $name, $default = false)
 
         $var = new DOMXpath($phpunitConfig);
         foreach ($var->query('//php/env[@name="'.$name.'"]') as $var) {
-            return $var->getAttribute('value');
+            $currentValue = $var->getAttribute('value');
+
+            if ('true' === $var->getAttribute('force')) {
+                return $currentValue;
+            } elseif (false === $value) {
+                return $currentValue;
+            }
         }
     }
 
@@ -333,7 +336,9 @@ $phpUnitConfigFiles = $loadPhpUnitConfigFiles();
 $runningProcs = array();
 $exit = 0;
 
-array_splice($argv, 1, 0, array('--colors=always'));
+if (!isset($argv[1]) || 'install' !== $argv[1]) {
+    array_splice($argv, 1, 0, array('--colors=always'));
+}
 
 $PHPUNIT_VERSION = $getPhpUnitVersion();
 $phpUnitConfigFile = null;
