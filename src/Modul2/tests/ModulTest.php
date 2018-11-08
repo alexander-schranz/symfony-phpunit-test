@@ -45,6 +45,8 @@ class ModulTest extends TestCase
         $this->assertSame('weak', getenv('SYMFONY_DEPRECATIONS_HELPER'));
         $this->assertSame('phpspec/prophecy', getenv('SYMFONY_PHPUNIT_REMOVE'));
         $this->assertSame('5.7', getenv('SYMFONY_PHPUNIT_VERSION'));
+        exec((defined('PHP_BINARY') ? PHP_BINARY : 'php') . ' ' . $_SERVER['SCRIPT_NAME'] . ' --version', $output);
+        $this->assertContains('PHPUnit 5.7', $output[0]);
 
         @trigger_error('Deprecation Error which should be ignored');
     }
