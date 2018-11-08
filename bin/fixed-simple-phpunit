@@ -15,8 +15,6 @@
 
 error_reporting(-1);
 
-global $argv, $argc, $PHP, $getEnvVar;
-
 // ------------------------------------------------------------------ //
 // Helper Functions                                                   //
 // ------------------------------------------------------------------ //
@@ -61,15 +59,15 @@ $getEnvVar = function ($phpUnitConfigFile, $name, $default = false)
 /**
  * Get the phpunit binary if not exist download phpunit install it with given configuration.
  *
+ * @param string $PHP
+ * @param callable $getEnvVar
  * @param string $phpUnitVersion
  * @param string|null $phpUnitConfigFile
  *
  * @return string
  */
-$getPHPUnit = function ($phpUnitVersion, $phpUnitConfigFile = null)
+$getPHPUnit = function ($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile = null)
 {
-    global $PHP, $getEnvVar;
-
     // Get project root directory where composer.json exists
     static $root;
 
@@ -210,14 +208,13 @@ EOPHP
 /**
  * Get the phpunit version from SYMFONY_PHPUNIT_VERSION env variable or the given phpunit config file.
  *
+ * @param callable $getEnvVar
  * @param string|null $phpUnitConfigFile
  *
  * @return mixed|string
  */
-$getPHPUnitVersion = function ($phpUnitConfigFile = null)
+$getPHPUnitVersion = function ($getEnvVar, $phpUnitConfigFile = null)
 {
-    global $getEnvVar;
-
     if (PHP_VERSION_ID >= 70200) {
         // PHPUnit 6 is required for PHP 7.2+
         $phpUnitVersion = $getEnvVar($phpUnitConfigFile, 'SYMFONY_PHPUNIT_VERSION', '6.5');
@@ -239,11 +236,11 @@ $getPHPUnitVersion = function ($phpUnitConfigFile = null)
  * bin/simple-phpunit -c path/to/phpunit.xml.dist -> return given phpunit file
  * bin/simple-phpunit path/to/folder -> return all phpunit config files in given folder
  *
+ * @param array $argv
+ *
  * @return array
  */
-$loadPHPUnitConfigFiles = function () {
-    global $argv;
-
+$loadPHPUnitConfigFiles = function (&$argv) {
     $outputError = function($text, $exitCode = 1)
     {
         echo "\033[41m" . $text . "\033[0m" . PHP_EOL;
@@ -332,9 +329,8 @@ $loadPHPUnitConfigFiles = function () {
 
 $argv = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
 $PHP = defined('PHP_BINARY') ? PHP_BINARY : 'php';
-$cmd = array_map('escapeshellarg', $argv);
 
-$phpUnitConfigFiles = $loadPHPUnitConfigFiles();
+$phpUnitConfigFiles = $loadPHPUnitConfigFiles($argv);
 
 $runningProcs = array();
 $exit = 0;
@@ -343,19 +339,19 @@ if (!isset($argv[1]) || 'install' !== $argv[1]) {
     array_splice($argv, 1, 0, array('--colors=always'));
 }
 
-$phpUnitVersion = $getPHPUnitVersion();
+$phpUnitVersion = $getPHPUnitVersion($getEnvVar);
 $phpUnitConfigFile = null;
 
 if (1 === count($phpUnitConfigFiles)) {
     // When only one phpunit config file run it directly in current process for streamed output
     $phpUnitConfigFile = reset($phpUnitConfigFiles);
-    $phpUnitVersion = $getPHPUnitVersion($phpUnitConfigFile);
+    $phpUnitVersion = $getPHPUnitVersion($getEnvVar, $phpUnitConfigFile);
     $argv[] = '-c';
     $argv[] = $phpUnitConfigFile;
 } else {
     foreach ($phpUnitConfigFiles as $phpUnitConfigFile) {
-        $phpUnitVersion = $getPHPUnitVersion($phpUnitConfigFile);
-        $phpUnit = $getPHPUnit($phpUnitVersion, $phpUnitConfigFile);
+        $phpUnitVersion = $getPHPUnitVersion($getEnvVar, $phpUnitConfigFile);
+        $phpUnit = $getPHPUnit($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile);
         $component = dirname($phpUnitConfigFile);
 
         $cmd = sprintf('%s %s -c %s %s > %s/phpunit.stdout 2> %s/phpunit.stderr',
@@ -412,7 +408,7 @@ if (count($runningProcs)) {
 } elseif (isset($argv[1]) && 'install' === $argv[1] || file_exists('install')) {
     // If not yet installed install phpunit
     if (0 === count($phpUnitConfigFiles)) {
-        $getPHPUnit($phpUnitVersion, $phpUnitConfigFile);
+        $getPHPUnit($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile);
     }
 } else {
     // If only one configuration file is found call phpunit directly
@@ -422,7 +418,7 @@ if (count($runningProcs)) {
 
     $_SERVER['argv'] = $argv;
     $_SERVER['argc'] = ++$argc;
-    include $getPHPUnit($phpUnitVersion, $phpUnitConfigFile);
+    include $getPHPUnit($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile);
 }
 
 exit($exit);
