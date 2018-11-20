@@ -11,7 +11,7 @@
  */
 
 // Please update when phpunit needs to be reinstalled with fresh deps:
-// Cache-Id-Version: 2017-11-22 09:30 UTC
+// Cache-Id-Version: 2018-11-20 15:30 UTC
 
 error_reporting(-1);
 
@@ -117,38 +117,14 @@ $getPHPUnit = function ($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile = 
     chdir($PHPUNIT_DIR);
 
     $phpUnitDirectory = basename(dirname($phpUnit));
-
-    if (file_exists($phpUnitDirectory)) {
-        passthru(sprintf('\\' === DIRECTORY_SEPARATOR ? '(del /S /F /Q %s & rmdir %1$s) >nul': 'rm -rf %s', $phpUnitDirectory));
-    }
-
-    // Download phpunit zip file
-    if (extension_loaded('openssl') && filter_var(ini_get('allow_url_fopen'), FILTER_VALIDATE_BOOLEAN) && !isset($_SERVER['http_proxy']) && !isset($_SERVER['https_proxy'])) {
-        $remoteZip = "https://github.com/sebastianbergmann/phpunit/archive/$phpUnitVersion.zip";
-        $remoteZipStream = @fopen($remoteZip, 'rb');
-        if (!$remoteZipStream) {
-            throw new \RuntimeException("Could not find $remoteZip");
-        }
-        stream_copy_to_stream($remoteZipStream, fopen("$phpUnitVersion.zip", 'wb'));
-    } elseif ('\\' === DIRECTORY_SEPARATOR) {
-        passthru("certutil -urlcache -split -f \"https://github.com/sebastianbergmann/phpunit/archive/$phpUnitVersion.zip\" $phpUnitVersion.zip");
-    } else {
-        @unlink("$phpUnitVersion.zip");
-        passthru("wget -q https://github.com/sebastianbergmann/phpunit/archive/$phpUnitVersion.zip");
-    }
-    if (!class_exists('ZipArchive')) {
-        throw new \Exception('simple-phpunit requires the "zip" PHP extension to be installed and enabled in order to uncompress the downloaded PHPUnit packages.');
-    }
-
-    // Extract phpunit file to own directory
     $extractDirectory = getcwd() . '/extract-' . $phpUnitDirectory;
 
-    $zip = new ZipArchive();
-    $zip->open("$phpUnitVersion.zip");
-    $zip->extractTo($extractDirectory);
-    $zip->close();
+    if (file_exists($extractDirectory)) {
+        passthru(sprintf('\\' === DIRECTORY_SEPARATOR ? '(del /S /F /Q %s & rmdir %1$s) >nul': 'rm -rf %s', $extractDirectory));
+    }
 
-    chdir($extractDirectory . '/phpunit-'. $phpUnitVersion);
+    passthru("$COMPOSER create-project --no-install --prefer-dist --no-scripts --no-plugins --no-progress --ansi phpunit/phpunit $extractDirectory \"$phpUnitVersion.*\"");
+    chdir($extractDirectory);
 
     // Remove dependencies like symfony/yaml and prophecy
     if ($SYMFONY_PHPUNIT_REMOVE) {
@@ -197,8 +173,7 @@ EOPHP
     );
 
     // After finishing dependency install move directory to correct place
-    rename($extractDirectory . '/phpunit-'. $phpUnitVersion, $PHPUNIT_DIR . '/' . $phpUnitDirectory);
-    rmdir($extractDirectory);
+    rename($extractDirectory, $PHPUNIT_DIR . '/' . $phpUnitDirectory);
 
     chdir($oldPwd);
 
