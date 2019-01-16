@@ -145,7 +145,7 @@ $getPHPUnit = function ($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile = 
     $prevRoot = getenv('COMPOSER_ROOT_VERSION');
     putenv("COMPOSER_ROOT_VERSION=$phpUnitVersion.99");
     // --no-suggest is not in the list to keep compat with composer 1.0, which is shipped with Ubuntu 16.04LTS
-    $exit = proc_close(proc_open("$COMPOSER install --no-dev --prefer-dist --no-progress --ansi", array(), $p, getcwd(), null, array('bypass_shell' => true)));
+    $exit = proc_close(proc_open("$COMPOSER install --no-dev --prefer-dist --no-progress --ansi", [], $p, getcwd(), null, ['bypass_shell' => true]));
     putenv('COMPOSER_ROOT_VERSION'.(false !== $prevRoot ? '='.$prevRoot : ''));
     if ($exit) {
         exit($exit);
@@ -353,7 +353,7 @@ if (count($runningProcs)) {
     // Wait for the processes to be finished and output there result
     while ($runningProcs) {
         usleep(300000);
-        $terminatedProcs = array();
+        $terminatedProcs = [];
         foreach ($runningProcs as $component => $proc) {
             $procStatus = proc_get_status($proc);
             if (!$procStatus['running']) {
@@ -364,7 +364,7 @@ if (count($runningProcs)) {
         }
 
         foreach ($terminatedProcs as $component => $procStatus) {
-            foreach (array('out', 'err') as $file) {
+            foreach (['out', 'err'] as $file) {
                 $file = "$component/phpunit.std$file";
                 readfile($file);
                 unlink($file);
@@ -374,7 +374,7 @@ if (count($runningProcs)) {
             // STATUS_STACK_BUFFER_OVERRUN (-1073740791/0xC0000409)
             // STATUS_ACCESS_VIOLATION (-1073741819/0xC0000005)
             // STATUS_HEAP_CORRUPTION (-1073740940/0xC0000374)
-            if ($procStatus && ('\\' !== DIRECTORY_SEPARATOR || !extension_loaded('apcu') || !filter_var(ini_get('apc.enable_cli'), FILTER_VALIDATE_BOOLEAN) || !in_array($procStatus, array(-1073740791, -1073741819, -1073740940)))) {
+            if ($procStatus && ('\\' !== DIRECTORY_SEPARATOR || !extension_loaded('apcu') || !filter_var(ini_get('apc.enable_cli'), FILTER_VALIDATE_BOOLEAN) || !in_array($procStatus, [-1073740791, -1073741819, -1073740940]))) {
                 $exit = $procStatus;
                 echo "\033[41mKO\033[0m $component\n\n";
             } else {
