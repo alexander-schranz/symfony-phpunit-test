@@ -120,7 +120,9 @@ $getPHPUnit = function ($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile = 
     $extractDirectory = getcwd() . '/extract-' . $phpUnitDirectory;
 
     if (file_exists($extractDirectory)) {
-        passthru(sprintf('\\' === DIRECTORY_SEPARATOR ? '(del /S /F /Q %s & rmdir %1$s) >nul': 'rm -rf %s', $extractDirectory));
+        passthru(sprintf('\\' === DIRECTORY_SEPARATOR ? 'rmdir /S /Q %s > NUL': 'rm -rf %s', "$extractDirectory.old"));
+        rename($extractDirectory, "$extractDirectory.old");
+        passthru(sprintf('\\' === DIRECTORY_SEPARATOR ? 'rmdir /S /Q %s': 'rm -rf %s', "$extractDirectory.old"));
     }
 
     passthru("$COMPOSER create-project --no-install --prefer-dist --no-scripts --no-plugins --no-progress --ansi phpunit/phpunit $extractDirectory \"$phpUnitVersion.*\"");
