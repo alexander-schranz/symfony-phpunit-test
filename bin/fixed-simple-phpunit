@@ -74,10 +74,12 @@ $getPHPUnit = function ($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile = 
     if (!$root) {
         $root = getenv('SYMFONY_PHPUNIT_ROOT_DIRECTORY');
 
+        $COMPOSER_JSON = getenv('COMPOSER') ?: 'composer.json';
+
         if (!$root) {
             // Go the folders up until find a composer.json file
             $root = __DIR__;
-            while (!file_exists($root.'/composer.json') || file_exists($root.'/DeprecationErrorHandler.php')) {
+            while (!file_exists($root.'/'.$COMPOSER_JSON) || file_exists($root.'/DeprecationErrorHandler.php')) {
                 if ($root === dirname($root)) {
                     break;
                 }
@@ -107,6 +109,20 @@ $getPHPUnit = function ($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile = 
 
     // Build a standalone phpunit without symfony/yaml nor prophecy by default
     $oldPwd = getcwd();
+
+    // Override COMPOSER_VENDOR_DIR and COMPOSER_BIN_DIR with their default values in PHPUnit Bridge
+    $defaultEnvs = [
+        'COMPOSER' => 'composer.json',
+        'COMPOSER_VENDOR_DIR' => 'vendor',
+        'COMPOSER_BIN_DIR' => 'bin',
+    ];
+
+    foreach ($defaultEnvs as $envName => $envValue) {
+        if ($envValue !== getenv($envName)) {
+            putenv("$envName=$envValue");
+            $_SERVER[$envName] = $_ENV[$envName] = $envValue;
+        }
+    }
 
     // Get composer binary for phpunit installation
     $COMPOSER = file_exists($COMPOSER = $oldPwd.'/composer.phar') || ($COMPOSER = rtrim('\\' === DIRECTORY_SEPARATOR ? preg_replace('/[\r\n].*/', '', `where.exe composer.phar`) : `which composer.phar 2> /dev/null`))
