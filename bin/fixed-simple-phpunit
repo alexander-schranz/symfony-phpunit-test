@@ -111,11 +111,11 @@ $getPHPUnit = function ($PHP, $getEnvVar, $phpUnitVersion, $phpUnitConfigFile = 
     $oldPwd = getcwd();
 
     // Override COMPOSER_VENDOR_DIR and COMPOSER_BIN_DIR with their default values in PHPUnit Bridge
-    $defaultEnvs = [
+    $defaultEnvs = array(
         'COMPOSER' => 'composer.json',
         'COMPOSER_VENDOR_DIR' => 'vendor',
         'COMPOSER_BIN_DIR' => 'bin',
-    ];
+    );
 
     foreach ($defaultEnvs as $envName => $envValue) {
         if ($envValue !== getenv($envName)) {
@@ -243,7 +243,7 @@ $loadPHPUnitConfigFiles = function (&$argv) {
         exit($exitCode);
     };
 
-    $phpUnitConfigFiles = [];
+    $phpUnitConfigFiles = array();
 
     // Use configuration file current folder when no arguments given
     if (!isset($argv[1])) {
@@ -371,7 +371,7 @@ if (count($runningProcs)) {
     // Wait for the processes to be finished and output there result
     while ($runningProcs) {
         usleep(300000);
-        $terminatedProcs = [];
+        $terminatedProcs = array();
         foreach ($runningProcs as $component => $proc) {
             $procStatus = proc_get_status($proc);
             if (!$procStatus['running']) {
